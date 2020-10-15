@@ -16,6 +16,7 @@ input['Y'] = false
 fps = 60
 maxTime = 200
 framesPerSequence = 5
+framesBetweenSequence = 3
 populationSize = 50
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
@@ -75,6 +76,7 @@ end
 function advanceFrames(num)
     for i = 1, num do
         joypad.set(input, 1)
+        displayPosition()
         emu.frameadvance()
     end
 end
@@ -90,9 +92,8 @@ function mysplit (inputstr, sep)
         return t
 end
 
---Main Loop
 function generateEntireInput()
-    sequenceLength = fps * maxTime / framesPerSequence
+    sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
     sequence = ''
 
     for i = 0, sequenceLength do
@@ -133,17 +134,20 @@ function initializePopulation()
     end
 end
 
+--Main Loop
 while true do
 
-    --running input string
     math.randomseed(os.time())
     inputString = generateEntireInput()
+
+    --running input string
     for key,value in pairs(mysplit(inputString, ',')) do
         for key2,value2 in pairs(mysplit(value, '+')) do
             setInput(value2)
             print(value2)
         end
-        advanceFrames(10)
+        advanceFrames(framesPerSequence)
         clearInput()
+        advanceFrames(framesBetweenSequence)
     end
 end
