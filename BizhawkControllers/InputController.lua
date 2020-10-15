@@ -13,8 +13,9 @@ input['Up'] = false
 input['X'] = false
 input['Y'] = false
 
+inputString="Right,Right+A,Right,A,Right+A,Right"
+
 function setInput(button)
-    success = false
 
     if button == 'A' then
         input['A'] = true
@@ -42,11 +43,40 @@ function setInput(button)
         success = false
     end
 
-    return success
 end
 
 function clearInput()
     for key,value in pairs(input) do
         input[key] = false
+    end
+end
+
+function advanceFrames(num)
+    for i = 1, num do
+        joypad.set(input, 1)
+        emu.frameadvance()
+    end
+end
+
+function mysplit (inputstr, sep)
+        if sep == nil then
+                sep = "%s"
+        end
+        local t={}
+        for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+                table.insert(t, str)
+        end
+        return t
+end
+
+while true do
+    for key,value in pairs(mysplit(inputString, ',')) do
+        for key2,value2 in pairs(mysplit(value, '+')) do
+            setInput(value2)
+            print(value2)
+        end
+        advanceFrames(10)
+        clearInput()
+        advanceFrames(20)
     end
 end
