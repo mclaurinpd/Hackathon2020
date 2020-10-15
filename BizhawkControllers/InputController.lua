@@ -13,7 +13,7 @@ input['Up'] = false
 input['X'] = false
 input['Y'] = false
 
-inputString="Right,Right+A,Right,A,Right+A,Right"
+inputString="Left,Right+A,Right,A,Right+A,Right"
 
 function setInput(button)
 
@@ -51,9 +51,23 @@ function clearInput()
     end
 end
 
+function displayPosition()
+    marioX = memory.read_s16_le(0x94)
+    animation = memory.read_s16_le(0x71)
+    gameMode = memory.read_s16_le(0x0100)
+    gui.text(50, 50, marioX)
+    gui.text(50, 75, "Animation: "..animation)          --if animation == 09 -> death
+    gui.text(50, 100, "Game Mode: "..gameMode)          --if game mode == 8204 w/out death animation -> victory
+end
+
+function calculateGrade()
+    grade = marioX
+end
+
 function advanceFrames(num)
     for i = 1, num do
-        joypad.set(input, 1)
+        Njoypad.set(input, 1)
+        displayPosition()
         emu.frameadvance()
     end
 end
@@ -69,7 +83,10 @@ function mysplit (inputstr, sep)
         return t
 end
 
+--Main Loop
 while true do
+
+    --running input string
     for key,value in pairs(mysplit(inputString, ',')) do
         for key2,value2 in pairs(mysplit(value, '+')) do
             setInput(value2)
@@ -79,4 +96,7 @@ while true do
         clearInput()
         advanceFrames(20)
     end
+
+    --grading input string
+    calculateGrade()
 end

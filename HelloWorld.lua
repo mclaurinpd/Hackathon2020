@@ -6,18 +6,27 @@
 -- To change this template use File | Settings | File Templates.
 --
 
+function Split(s, delimiter)
+    result = {};
+    for match in (s..delimiter):gmatch("(.-)"..delimiter) do
+        table.insert(result, match);
+    end
+    return result;
+end
+
 --Main Script Loop
-x = 0
+x = 1
+testTable = Split("Right, Right, Right+A, Right", ",")
 
 while true do
-    gui.text(50, 50, 'Hello World!')
+    gui.text(50, 50, testTable[x])
+    --x = x + 1
 
-    if x > 100 then
+    if testTable[x] == nil then
         gui.text(50, 75, "If became true")
-        x = 0
+        x = 1
     end
 
     emu.frameadvance()
-    x = x + 1
 end
 
