@@ -54,6 +54,15 @@ function setInput(button)
 
 end
 
+function newSolution()
+    local solution = {}
+
+    solution.inputString = ""
+    solution.grade = 0
+
+    return solution
+end
+
 function clearInput()
     for key,value in pairs(input) do
         input[key] = false
@@ -93,14 +102,14 @@ function mysplit (inputstr, sep)
 end
 
 function generateEntireInput()
-    sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
-    sequence = ''
+    local sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
+    local solution = newSolution()
 
     for i = 0, sequenceLength do
-        sequence = sequence .. generateInputElement()
+        solution.inputString = solution.inputString .. generateInputElement()
     end
 
-    return sequence
+    return solution
 end
 
 function generateInputElement()
@@ -128,6 +137,17 @@ function generateInputElement()
     return element
 end
 
+function runSolution(solution)
+    --running input string
+    for key,value in pairs(mysplit(solution.inputString, ',')) do
+        for key2,value2 in pairs(mysplit(value, '+')) do
+            setInput(value2)
+        end
+        advanceFrames(framesPerSequence)
+        clearInput()
+    end
+end
+
 function initializePopulation()
     for i = 1, populationSize do
         population[i] = generateEntireInput()
@@ -138,16 +158,12 @@ end
 while true do
 
     math.randomseed(os.time())
-    inputString = generateEntireInput()
 
-    --running input string
-    for key,value in pairs(mysplit(inputString, ',')) do
-        for key2,value2 in pairs(mysplit(value, '+')) do
-            setInput(value2)
-            print(value2)
-        end
-        advanceFrames(framesPerSequence)
-        clearInput()
-        advanceFrames(framesBetweenSequence)
+    initializePopulation()
+
+    for i = 1, populationSize do
+        savestate.load('YoshisIsland2.State')
+        runSolution(population[i])
     end
+
 end
