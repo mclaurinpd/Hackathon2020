@@ -13,7 +13,15 @@ input['Up'] = false
 input['X'] = false
 input['Y'] = false
 
-inputString="Left,Right+A,Right,A,Right+A,Right"
+fps = 60
+maxTime = 200
+framesPerSequence = 5
+populationSize = 50
+
+allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
+buttonInputs = {'A', 'B', 'X', 'N' }
+
+population = {}
 
 function setInput(button)
 
@@ -39,8 +47,8 @@ function setInput(button)
         input['X'] = true
     elseif button == 'Y' then
         input['Y'] = true
-    else
-        success = false
+    elseif button == 'Left' then
+        input['Left'] = true
     end
 
 end
@@ -66,8 +74,7 @@ end
 
 function advanceFrames(num)
     for i = 1, num do
-        Njoypad.set(input, 1)
-        displayPosition()
+        joypad.set(input, 1)
         emu.frameadvance()
     end
 end
@@ -84,9 +91,53 @@ function mysplit (inputstr, sep)
 end
 
 --Main Loop
+function generateEntireInput()
+    sequenceLength = fps * maxTime / framesPerSequence
+    sequence = ''
+
+    for i = 0, sequenceLength do
+        sequence = sequence .. generateInputElement()
+    end
+
+    return sequence
+end
+
+function generateInputElement()
+    local x = math.random(1,7)
+    local y = math.random(1,4)
+    local element = ""
+
+    local firstInput = allInputs[x]
+    local secondInput = buttonInputs[y]
+
+    if firstInput == 'N' then
+        element = element .. firstInput .. ','
+        return element
+    end
+
+    element = element .. firstInput
+
+    if secondInput == 'N' then
+        element = element .. ','
+        return element
+    end
+
+    element = element .. '+' .. secondInput .. ','
+
+    return element
+end
+
+function initializePopulation()
+    for i = 1, populationSize do
+        population[i] = generateEntireInput()
+    end
+end
+
 while true do
 
     --running input string
+    math.randomseed(os.time())
+    inputString = generateEntireInput()
     for key,value in pairs(mysplit(inputString, ',')) do
         for key2,value2 in pairs(mysplit(value, '+')) do
             setInput(value2)
@@ -94,9 +145,5 @@ while true do
         end
         advanceFrames(10)
         clearInput()
-        advanceFrames(20)
     end
-
-    --grading input string
-    calculateGrade()
 end
