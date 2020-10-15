@@ -1,23 +1,19 @@
-InputController = {input = {}}
+input = {}
 
-function InputController:create (o)
-    o.parent = self
-    input['A'] = false
-    input['B'] = false
-    input['Down'] = false
-    input['L'] = false
-    input['Left'] = false
-    input['R'] = false
-    input['Right'] = false
-    input['Select'] = false
-    input['Start'] = false
-    input['Up'] = false
-    input['X'] = false
-    input['Y'] = false
-    return o
-end
+input['A'] = false
+input['B'] = false
+input['Down'] = false
+input['L'] = false
+input['Left'] = false
+input['R'] = false
+input['Right'] = false
+input['Select'] = false
+input['Start'] = false
+input['Up'] = false
+input['X'] = false
+input['Y'] = false
 
-function InputController:setInput(button)
+function setInput(button)
     success = false
 
     if button == 'A' then
@@ -49,7 +45,7 @@ function InputController:setInput(button)
     return success
 end
 
-function InputController:clearInputs()
+function clearInput()
     for key,value in pairs(input) do
         input[key] = false
     end
