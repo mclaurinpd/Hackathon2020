@@ -14,13 +14,13 @@ input['X'] = false
 input['Y'] = false
 
 Filename = 'DP1.State'
-fps = 60
+fps = 30
 maxTime = 90
 framesPerSequence = 5
 framesBetweenSequence = 3
-populationSize = 50
+populationSize = 25
 sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
-biasValue = 0.3
+biasValue = 0.5
 deathPenalty = 50
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
@@ -278,6 +278,7 @@ end
 --Starts new generation with best 2 from previous generation
 --
 function crossoverMR1()
+    print("TESTING CROSSOVER")
     local newPop = {}
     newPop[1] = population[1]
     newPop[2] = population[2]
@@ -288,17 +289,28 @@ function crossoverMR1()
     newParentIndex = 3
     newPopIndex = 5
     while table.getn(newPop) < populationSize do
+        print("ADDING PARENT: "..newParentIndex)
         newPop[newPopIndex] = population[newParentIndex]
         newPopIndex = newPopIndex + 1
 
         for i = 1, newParentIndex - 1 do
+            print("CREATING CHILD ("..i..","..newParentIndex..")")
             newPop[newPopIndex] = createChild(population[i], population[newParentIndex])
             newPopIndex = newPopIndex + 1
 
             if table.getn(newPop) > populationSize then
                 break
             end
+
+            print("CREATING CHILD ("..newParentIndex..","..i..")")
+            newPop[newPopIndex] = createChild(population[newParentIndex], population[i])
+            newPopIndex = newPopIndex + 1
+
+            if table.getn(newPop) > populationSize then
+                break
+            end
         end
+        newParentIndex = newParentIndex + 1
     end
 
     population = newPop
