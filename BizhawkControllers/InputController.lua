@@ -19,6 +19,7 @@ maxTime = 10
 framesPerSequence = 5
 framesBetweenSequence = 3
 populationSize = 10
+sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
 buttonInputs = {'A', 'B', 'X', 'N' }
@@ -119,7 +120,6 @@ function mysplit (inputstr, sep)
 end
 
 function generateEntireInput()
-    local sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
     local solution = newSolution()
 
     for i = 0, sequenceLength do
@@ -176,8 +176,8 @@ function runSolution(solution)
     console.log("Grade: "..solution.grade)
 end
 
+--Creates new solution by grabbing every other instruction from each given solution
 function createChild(sln1, sln2)
-    local sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
     local solution = newSolution()
     local sequence = ""
     local sln1Seq = mysplit(sln1.inputString, ',')
@@ -233,9 +233,5 @@ while true do
     end
 
     sortPopulationByScore()
-
-    for i=1,populationSize do
-        print(population[i].grade)
-    end
 
 end
