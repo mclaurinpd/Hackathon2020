@@ -15,10 +15,12 @@ input['Y'] = false
 
 Filename = 'DP1.State'
 fps = 60
-maxTime = 10
+maxTime = 120
 framesPerSequence = 5
 framesBetweenSequence = 3
-populationSize = 1
+populationSize = 10
+generations = 10
+sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
 buttonInputs = {'A', 'B', 'X', 'N' }
@@ -119,7 +121,7 @@ function mysplit (inputstr, sep)
 end
 
 function generateEntireInput()
-    local sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
+
     local solution = newSolution()
 
     for i = 0, sequenceLength do
@@ -127,6 +129,20 @@ function generateEntireInput()
     end
 
     return solution
+end
+
+function applyBias(sln)
+    local str = mysplit(sln.inputString, ',')
+    local count = 0
+
+    for i = 1, sequenceLength do
+        if string.match(str[i], "Left") then
+            count = count + 1
+        end
+    end
+
+    sln.grade = sln.grade - .3 * count
+
 end
 
 function generateInputElement()
@@ -173,6 +189,7 @@ function runSolution(solution)
     end
 
     solution.grade = grade
+    applyBias(solution)
     console.log("Grade: "..solution.grade)
 end
 
@@ -183,13 +200,15 @@ function createChild(sln1, sln2)
     local sln1Seq = mysplit(sln1.inputString, ',')
     local sln2Seq = mysplit(sln2.inputString, ',')
     local flag = true
+    local mutate = shouldMutate()
+    local mutationNum = math.random(1, sequenceLength)
 
-    for i = 1, 2 do
-        if flag then
-            print(sln1Seq[i])
+    for i = 1, sequenceLength do
+        if mutate and i == mutationNum then
+            sequence = sequence .. ',' .. generateInputElement()
+        elseif flag then
             sequence = sequence .. ',' .. sln1Seq[i]
         else
-            print(sln2Seq[i])
             sequence = sequence .. ',' .. sln2Seq[i]
         end
 
@@ -197,10 +216,33 @@ function createChild(sln1, sln2)
     end
 
     solution.inputString = sequence
-    print(sequence)
 
     return solution
 
+end
+
+function crossOver()
+    local newPop = {}
+    josephSmith = population[1]
+
+    for i = 2, 6 do
+        wife = population[i]
+        table.insert(newPop, createChild(josephSmith, wife))
+        table.insert(newPop, createChild(wife, josephSmith))
+    end
+
+    population = newPop
+
+end
+
+function shouldMutate()
+    local chance = math.random()
+
+    if chance > .5 then
+        return true
+    end
+
+    return false
 end
 
 function sortPopulationByScore()
@@ -220,11 +262,14 @@ while true do
 
     initializePopulation()
 
-    for i = 1, populationSize do
-        savestate.load(Filename)
-        runSolution(population[i])
+    for x = 1, generations do
+        for i = 1, populationSize do
+            savestate.load(Filename)
+            runSolution(population[i])
+        end
+        sortPopulationByScore()
+        print(population[1].grade)
+        crossOver()
     end
-
-    sortPopulationByScore()
 
 end
