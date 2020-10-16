@@ -13,6 +13,7 @@ input['Up'] = false
 input['X'] = false
 input['Y'] = false
 
+Filename = 'DP1.State'
 fps = 60
 maxTime = 200
 framesPerSequence = 5
@@ -69,11 +70,15 @@ function clearInput()
     end
 end
 
-function displayPosition()
+function readGameData()
     marioX = memory.read_s16_le(0x94)
     animation = memory.read_s16_le(0x71)
     gameMode = memory.read_s16_le(0x0100)
-    gui.text(50, 50, marioX)
+end
+
+function displayGameData()
+    calculateGrade()
+    gui.text(50, 50, grade)
     gui.text(50, 75, "Animation: "..animation)          --if animation == 09 -> death
     gui.text(50, 100, "Game Mode: "..gameMode)          --if game mode == 8204 w/out death animation -> victory
 end
@@ -85,7 +90,19 @@ end
 function advanceFrames(num)
     for i = 1, num do
         joypad.set(input, 1)
-        displayPosition()
+        readGameData()
+        displayGameData()
+
+        if animation == 09 or animation == 9225 then
+            death = true
+            break
+        end
+
+        if gameMode == 8204 then
+            finish = true
+            break
+        end
+
         emu.frameadvance()
     end
 end
@@ -138,6 +155,9 @@ function generateInputElement()
 end
 
 function runSolution(solution)
+    death = false
+    finish = false
+
     --running input string
     for key,value in pairs(mysplit(solution.inputString, ',')) do
         for key2,value2 in pairs(mysplit(value, '+')) do
@@ -145,6 +165,13 @@ function runSolution(solution)
         end
         advanceFrames(framesPerSequence)
         clearInput()
+        advanceFrames(framesBetweenSequence)
+
+        if death or finish then
+            solution.grade = grade
+            console.log("Grade: "..solution.grade)
+            break
+        end
     end
 end
 
@@ -162,7 +189,7 @@ while true do
     initializePopulation()
 
     for i = 1, populationSize do
-        savestate.load('YoshisIsland2.State')
+        savestate.load(Filename)
         runSolution(population[i])
     end
 
