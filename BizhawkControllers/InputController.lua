@@ -18,7 +18,7 @@ fps = 60
 maxTime = 10
 framesPerSequence = 5
 framesBetweenSequence = 3
-populationSize = 5
+populationSize = 10
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
 buttonInputs = {'A', 'B', 'X', 'N' }
@@ -186,12 +186,19 @@ function initializePopulation()
     end
 end
 
+--Small scale testing crossover algorithm
+--Starts new generation with best 2 from previous generation
+--
+function crossoverMR1()
+
+end
+
+--Initialization
+math.randomseed(os.time())
+initializePopulation()
+
 --Main Loop
 while true do
-
-    math.randomseed(os.time())
-
-    initializePopulation()
 
     for i = 1, populationSize do
         savestate.load(Filename)
@@ -201,6 +208,7 @@ while true do
     sortPopulationByScore()
 
     for i=1,populationSize do
+        crossoverMR1()
         print(population[i].grade)
     end
 
