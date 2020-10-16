@@ -15,10 +15,10 @@ input['Y'] = false
 
 Filename = 'DP1.State'
 fps = 60
-maxTime = 10
+maxTime = 30
 framesPerSequence = 5
 framesBetweenSequence = 3
-populationSize = 10
+populationSize = 50
 sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
@@ -173,7 +173,12 @@ function runSolution(solution)
     end
 
     solution.grade = grade
+    applyBiasMR(solution)
     console.log("Grade: "..solution.grade)
+end
+
+function applyBiasMR(solution)
+    countLefts(solution.inputString)
 end
 
 --Creates new solution by grabbing every other instruction from each given solution
@@ -184,12 +189,12 @@ function createChild(sln1, sln2)
     local sln2Seq = mysplit(sln2.inputString, ',')
     local flag = true
 
-    for i = 1, 2 do
+    for i = 1, sequenceLength do
         if flag then
-            print(sln1Seq[i])
+            --print(sln1Seq[i])
             sequence = sequence .. ',' .. sln1Seq[i]
         else
-            print(sln2Seq[i])
+            --print(sln2Seq[i])
             sequence = sequence .. ',' .. sln2Seq[i]
         end
 
@@ -197,7 +202,7 @@ function createChild(sln1, sln2)
     end
 
     solution.inputString = sequence
-    print(sequence)
+    --print(sequence)
 
     return solution
 
@@ -213,19 +218,44 @@ function initializePopulation()
     end
 end
 
---Small scale testing crossover algorithm
+--Small scale testing crossover algorithm (requires populationSize > 4)
 --Starts new generation with best 2 from previous generation
 --
 function crossoverMR1()
+    local newPop = {}
+    newPop[1] = population[1]
+    newPop[2] = population[2]
 
+    newPop[3] = createChild(population[1], population[2])
+    newPop[4] = createChild(population[2], population[1])
+
+    newParentIndex = 3
+    newPopIndex = 5
+    while table.getn(newPop) < populationSize do
+        newPop[newPopIndex] = population[newParentIndex]
+        newPopIndex = newPopIndex + 1
+
+        for i = 1, newParentIndex - 1 do
+            newPop[newPopIndex] = createChild(population[i], population[newParentIndex])
+            newPopIndex = newPopIndex + 1
+
+            if table.getn(newPop) > populationSize then
+                break
+            end
+        end
+    end
+
+    population = newPop
 end
 
 --Initialization
 math.randomseed(os.time())
 initializePopulation()
+generation = 1
 
 --Main Loop
 while true do
+    print("Generation: "..generation)
 
     for i = 1, populationSize do
         savestate.load(Filename)
@@ -233,5 +263,6 @@ while true do
     end
 
     sortPopulationByScore()
-
+    crossoverMR1()
+    generation = generation + 1
 end
