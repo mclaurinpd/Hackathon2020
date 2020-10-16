@@ -187,10 +187,10 @@ function createChild(sln1, sln2)
     for i = 1, 2 do
         if flag then
             print(sln1Seq[i])
-            sequence = sequence .. sln1Seq[i]
+            sequence = sequence .. ',' .. sln1Seq[i]
         else
             print(sln2Seq[i])
-            sequence = sequence .. sln2Seq[i]
+            sequence = sequence .. ',' .. sln2Seq[i]
         end
 
         flag = not flag
