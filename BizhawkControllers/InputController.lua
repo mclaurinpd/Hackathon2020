@@ -15,7 +15,7 @@ input['Y'] = false
 
 Filename = 'DP1.State'
 fps = 60
-maxTime = 200
+maxTime = 10
 framesPerSequence = 5
 framesBetweenSequence = 3
 populationSize = 50
@@ -168,11 +168,12 @@ function runSolution(solution)
         advanceFrames(framesBetweenSequence)
 
         if death or finish then
-            solution.grade = grade
-            console.log("Grade: "..solution.grade)
             break
         end
     end
+
+    solution.grade = grade
+    console.log("Grade: "..solution.grade)
 end
 
 function initializePopulation()
