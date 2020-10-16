@@ -18,7 +18,7 @@ fps = 60
 maxTime = 10
 framesPerSequence = 5
 framesBetweenSequence = 3
-populationSize = 50
+populationSize = 5
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
 buttonInputs = {'A', 'B', 'X', 'N' }
@@ -176,6 +176,10 @@ function runSolution(solution)
     console.log("Grade: "..solution.grade)
 end
 
+function sortPopulationByScore()
+    table.sort(population, function(a, b) return a.grade > b.grade end)
+end
+
 function initializePopulation()
     for i = 1, populationSize do
         population[i] = generateEntireInput()
@@ -192,6 +196,12 @@ while true do
     for i = 1, populationSize do
         savestate.load(Filename)
         runSolution(population[i])
+    end
+
+    sortPopulationByScore()
+
+    for i=1,populationSize do
+        print(population[i].grade)
     end
 
 end
