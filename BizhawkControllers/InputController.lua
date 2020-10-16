@@ -15,12 +15,14 @@ input['Y'] = false
 
 Filename = 'DP1.State'
 fps = 60
-maxTime = 120
+maxTime = 300
 framesPerSequence = 5
 framesBetweenSequence = 3
 populationSize = 10
 generations = 10
 sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
+mutationChance = .1
+mutationsAllowed = 10
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
 buttonInputs = {'A', 'B', 'X', 'N' }
@@ -70,6 +72,16 @@ function clearInput()
     for key,value in pairs(input) do
         input[key] = false
     end
+end
+
+function hasValue(table, val)
+    for index, value in ipairs(table) do
+        if value == val then
+            return true
+        end
+    end
+
+    return false
 end
 
 function readGameData()
@@ -141,7 +153,7 @@ function applyBias(sln)
         end
     end
 
-    sln.grade = sln.grade - .3 * count
+    sln.grade = sln.grade - .8 * count
 
 end
 
@@ -193,26 +205,49 @@ function runSolution(solution)
     console.log("Grade: "..solution.grade)
 end
 
+function getMutationIndices()
+    local mutationIndices = {}
+    for i = 1, mutationsAllowed do
+        table.insert(mutationIndices, math.random(1, sequenceLength))
+    end
+
+    return mutationIndices
+end
+
+function shouldMutate()
+    local chance = math.random()
+
+    if not (chance < mutationChance) then
+        return true
+    end
+
+    return false
+end
+
 function createChild(sln1, sln2)
     local sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
     local solution = newSolution()
     local sequence = ""
     local sln1Seq = mysplit(sln1.inputString, ',')
     local sln2Seq = mysplit(sln2.inputString, ',')
-    local flag = true
+    local pivot = math.random(-50,50)
     local mutate = shouldMutate()
-    local mutationNum = math.random(1, sequenceLength)
+    local mutationLocations = getMutationIndices()
 
-    for i = 1, sequenceLength do
-        if mutate and i == mutationNum then
+    for i = 1, sequenceLength/2 - pivot do
+        if mutate and hasValue(mutationLocations, i) then
             sequence = sequence .. ',' .. generateInputElement()
-        elseif flag then
+        else
             sequence = sequence .. ',' .. sln1Seq[i]
+        end
+    end
+
+    for i = sequenceLength/2 - (pivot +1), sequenceLength do
+        if mutate and hasValue(mutationLocations, i) then
+            sequence = sequence .. ',' .. generateInputElement()
         else
             sequence = sequence .. ',' .. sln2Seq[i]
         end
-
-        flag = not flag
     end
 
     solution.inputString = sequence
@@ -233,16 +268,6 @@ function crossOver()
 
     population = newPop
 
-end
-
-function shouldMutate()
-    local chance = math.random()
-
-    if chance > .5 then
-        return true
-    end
-
-    return false
 end
 
 function sortPopulationByScore()
