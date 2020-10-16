@@ -176,6 +176,33 @@ function runSolution(solution)
     console.log("Grade: "..solution.grade)
 end
 
+function createChild(sln1, sln2)
+    local sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
+    local solution = newSolution()
+    local sequence = ""
+    local sln1Seq = mysplit(sln1.inputString, ',')
+    local sln2Seq = mysplit(sln2.inputString, ',')
+    local flag = true
+
+    for i = 1, 2 do
+        if flag then
+            print(sln1Seq[i])
+            sequence = sequence .. sln1Seq[i]
+        else
+            print(sln2Seq[i])
+            sequence = sequence .. sln2Seq[i]
+        end
+
+        flag = not flag
+    end
+
+    solution.inputString = sequence
+    print(sequence)
+
+    return solution
+
+end
+
 function sortPopulationByScore()
     table.sort(population, function(a, b) return a.grade > b.grade end)
 end
@@ -208,7 +235,6 @@ while true do
     sortPopulationByScore()
 
     for i=1,populationSize do
-        crossoverMR1()
         print(population[i].grade)
     end
 
