@@ -15,11 +15,13 @@ input['Y'] = false
 
 Filename = 'DP1.State'
 fps = 60
-maxTime = 30
+maxTime = 90
 framesPerSequence = 5
 framesBetweenSequence = 3
 populationSize = 50
 sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
+biasValue = 0.3
+deathPenalty = 50
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
 buttonInputs = {'A', 'B', 'X', 'N' }
@@ -192,7 +194,22 @@ function runSolution(solution)
 end
 
 function applyBiasMR(solution)
-    countLefts(solution.inputString)
+    numLefts = countLefts(mysplit(solution.inputString, ","))
+    solution.grade = solution.grade - (numLefts * biasValue)
+
+    if death then
+        solution.grade = solution.grade - 50
+    end
+end
+
+function countLefts(str)
+    count = 0
+    for i = 1, sequenceLength do
+        if string.match(str[i], "Left") then
+            count = count + 1
+        end
+    end
+    return count
 end
 
 --Creates new solution by grabbing every other instruction from each given solution
