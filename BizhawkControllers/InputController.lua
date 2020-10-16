@@ -18,13 +18,14 @@ fps = 60
 maxTime = 120
 framesPerSequence = 5
 framesBetweenSequence = 3
-populationSize = 10
+populationSize = 20
 generations = 10
 sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
-biasValue = 0.5
+biasValue = 10
 deathPenalty = 50
 mutationChance = .1
-mutationsAllowed = 10
+mutationsAllowed = 50
+leftBias = 0.5
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
 buttonInputs = {'A', 'B', 'X', 'N' }
@@ -149,7 +150,7 @@ function applyBias(sln)
     local count = 0
 
     for i = 1, sequenceLength do
-        if string.match(str[i], "Left") then
+        if string.find(str[i], "Left") then
             count = count + 1
         end
     end
@@ -166,6 +167,12 @@ function generateInputElement()
     local firstInput = allInputs[x]
     local secondInput = buttonInputs[y]
 
+    if firstInput == 'Left' then
+        if shouldChangeLeft() then
+            firstInput = 'Right'
+        end
+    end
+
     if firstInput == 'N' then
         element = element .. firstInput .. ','
         return element
@@ -181,6 +188,16 @@ function generateInputElement()
     element = element .. '+' .. secondInput .. ','
 
     return element
+end
+
+function shouldChangeLeft()
+    local chance = math.random()
+
+    if (chance > leftBias) then
+        return true
+    end
+
+    return false
 end
 
 function runSolution(solution)
@@ -209,16 +226,12 @@ end
 function applyBiasMR(solution)
     numLefts = countLefts(mysplit(solution.inputString, ","))
     solution.grade = solution.grade - (numLefts * biasValue)
-
-    if death then
-        solution.grade = solution.grade - 50
-    end
 end
 
 function countLefts(str)
     count = 0
     for i = 1, sequenceLength do
-        if string.match(str[i], "Left") then
+        if string.find(str[i], "Left") then
             count = count + 1
         end
     end
