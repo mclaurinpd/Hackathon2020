@@ -129,6 +129,20 @@ function generateEntireInput()
     return solution
 end
 
+function applyBias(sln)
+    local str = mysplit(sln.inputString, ',')
+    local count = 0
+
+    for i = 1, sequenceLength do
+        if string.match(str[i], "Left") then
+            count = count + 1
+        end
+    end
+
+    sln.grade = sln.grade - .3 * count
+
+end
+
 function generateInputElement()
     local x = math.random(1,7)
     local y = math.random(1,4)
@@ -188,13 +202,15 @@ function createChild(sln1, sln2)
     local sln1Seq = mysplit(sln1.inputString, ',')
     local sln2Seq = mysplit(sln2.inputString, ',')
     local flag = true
+    local mutate = shouldMutate()
+    local mutationNum = math.random(1, sequenceLength)
 
     for i = 1, sequenceLength do
-        if flag then
-            --print(sln1Seq[i])
+        if mutate and i == mutationNum then
+            sequence = sequence .. ',' .. generateInputElement()
+        elseif flag then
             sequence = sequence .. ',' .. sln1Seq[i]
         else
-            --print(sln2Seq[i])
             sequence = sequence .. ',' .. sln2Seq[i]
         end
 
@@ -202,10 +218,33 @@ function createChild(sln1, sln2)
     end
 
     solution.inputString = sequence
-    --print(sequence)
 
     return solution
 
+end
+
+function crossOver()
+    local newPop = {}
+    josephSmith = population[1]
+
+    for i = 2, 6 do
+        wife = population[i]
+        table.insert(newPop, createChild(josephSmith, wife))
+        table.insert(newPop, createChild(wife, josephSmith))
+    end
+
+    population = newPop
+
+end
+
+function shouldMutate()
+    local chance = math.random()
+
+    if chance > .5 then
+        return true
+    end
+
+    return false
 end
 
 function sortPopulationByScore()
