@@ -13,19 +13,27 @@ input['Up'] = false
 input['X'] = false
 input['Y'] = false
 
-Filename = 'DP1.State'
-fps = 60
-maxTime = 120
-framesPerSequence = 5
-framesBetweenSequence = 3
-populationSize = 20
+--System
+Filename = 'YoshisIsland1.State'
+fps = 60                                    --SMW fps
+maxTime = 300                               --Time to run per level
+framesPerSequence = 10                      --Number of frames inputs will be held for
+framesBetweenSequence = 0                   --Number of frames inputs will be released between instructions
+sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)            --Calculates length of input sequence
+
+--Genetic Algorithm
+populationSize = 20                         --Size of population used by genetic algorithm
 generations = 10
-sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)
-biasValue = 10
-deathPenalty = 50
-mutationChance = .1
-mutationsAllowed = 50
-leftBias = 0.5
+mutationChance = .2                         --Chance child will mutate
+mutationsAllowed = 550                      --Number of inputs that will be altered with mutation
+deathBuffer = 20                            --Number of inputs before death to start crossover
+pivotRange = 50                             --Maximum number of inputs away from midpoint to start crossover
+
+--Bonuses/Biases
+rightBias = 0.75                            --Percentage chance that initial input will contain 'Right'
+speedBias = 5                               --Bonus applied for average speed of solution
+victoryBonus = 10000                        --Flat bonus applied to ensure success is favored above everything else
+biasValue = 10                              --Penalty applied for number of 'Left' inputs
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
 buttonInputs = {'A', 'B', 'X', 'N' }
@@ -67,6 +75,8 @@ function newSolution()
 
     solution.inputString = ""
     solution.grade = 0
+    solution.lastInput = 0
+    solution.died = false
 
     return solution
 end
@@ -87,10 +97,18 @@ function hasValue(table, val)
     return false
 end
 
+function readTime()
+    timerHundreds = memory.readbyte(0xF31)
+    timerTens = memory.readbyte(0xF32)
+    timerOnes = memory.readbyte(0xF33)
+    timerValue = timerHundreds..timerTens..timerOnes
+end
+
 function readGameData()
     marioX = memory.read_s16_le(0x94)
-    animation = memory.read_s16_le(0x71)
-    gameMode = memory.read_s16_le(0x0100)
+    animation = memory.readbyte(0x71)
+    gameMode = memory.readbyte(0x13D6)
+    readTime()
 end
 
 function displayGameData()
@@ -98,10 +116,15 @@ function displayGameData()
     gui.text(50, 50, grade)
     gui.text(50, 75, "Animation: "..animation)          --if animation == 09 -> death
     gui.text(50, 100, "Game Mode: "..gameMode)          --if game mode == 8204 w/out death animation -> victory
+    gui.text(50, 125, "Timer Value: "..timerValue)
+    gui.text(50, 150, "Initial Time: "..initialTime)
+    gui.text(50, 200, "Elapsed Time: "..(initialTime -  timerValue))
+    gui.text(50, 225, "Average Speed: "..(marioX/(initialTime - timerValue)))
 end
 
 function calculateGrade()
-    grade = marioX
+    averageSpeed = marioX/(initialTime - timerValue)
+    grade = marioX + (speedBias * averageSpeed)
 end
 
 function advanceFrames(num)
@@ -110,12 +133,12 @@ function advanceFrames(num)
         readGameData()
         displayGameData()
 
-        if animation == 09 or animation == 9225 then
+        if animation == 9 then
             death = true
             break
         end
 
-        if gameMode == 8204 then
+        if gameMode == 1 then
             finish = true
             break
         end
@@ -167,8 +190,8 @@ function generateInputElement()
     local firstInput = allInputs[x]
     local secondInput = buttonInputs[y]
 
-    if firstInput == 'Left' then
-        if shouldChangeLeft() then
+    if firstInput ~= 'Right' then
+        if shouldChangeInput() then
             firstInput = 'Right'
         end
     end
@@ -190,10 +213,10 @@ function generateInputElement()
     return element
 end
 
-function shouldChangeLeft()
+function shouldChangeInput()
     local chance = math.random()
 
-    if (chance > leftBias) then
+    if (chance < rightBias) then
         return true
     end
 
@@ -203,6 +226,7 @@ end
 function runSolution(solution)
     death = false
     finish = false
+    index = 1
 
     --running input string
     for key,value in pairs(mysplit(solution.inputString, ',')) do
@@ -212,19 +236,38 @@ function runSolution(solution)
         advanceFrames(framesPerSequence)
         clearInput()
         advanceFrames(framesBetweenSequence)
+        index = index + 1
 
         if death or finish then
+            solution.lastInput = index
+            if death then
+                solution.died = true
+            end
             break
         end
     end
 
     solution.grade = grade
+
+    if finish == true then
+        solution.grade = solution.grade + victoryBonus
+    end
+
     applyBiasMR(solution)
+    console.log("Average Speed: "..averageSpeed)
+    console.log("Position: "..marioX)
     console.log("Grade: "..solution.grade)
+    console.log("Last Input: "..solution.lastInput)
+    console.log("Died: "..(solution.died and 'true' or 'false'))
+
+    if finish == true then
+        console.log("SUCCESS!!!")
+    end
 end
 
 function applyBiasMR(solution)
     numLefts = countLefts(mysplit(solution.inputString, ","))
+    print("Number of Lefts:"..numLefts)
     solution.grade = solution.grade - (numLefts * biasValue)
 end
 
@@ -238,7 +281,6 @@ function countLefts(str)
     return count
 end
 
---Creates new solution by grabbing every other instruction from each given solution
 function getMutationIndices()
     local mutationIndices = {}
     for i = 1, mutationsAllowed do
@@ -258,12 +300,45 @@ function shouldMutate()
     return false
 end
 
+function createChildMR(sln1, sln2)
+    local solution = newSolution()
+    local sequence = ""
+    local sln1Seq = mysplit(sln1.inputString, ',')
+    local sln2Seq = mysplit(sln2.inputString, ',')
+    local pivot = math.random((-1 * pivotRange),pivotRange)
+
+    if sln1.died then
+        for i = 1, sln1.lastInput - deathBuffer do
+            sequence = sequence..sln1Seq[i]..','
+        end
+
+        for i = sln1.lastInput - deathBuffer + 1, sln1.lastInput + deathBuffer do
+            sequence = sequence..generateInputElement()..','
+        end
+
+        for i = sln1.lastInput + deathBuffer + 1, sequenceLength do
+            sequence = sequence..sln2Seq[i]..','
+        end
+    else
+        for i = 1, math.floor(sln1.lastInput/2) - pivot do
+            sequence = sequence..sln1Seq[i]..','
+        end
+
+        for i = math.floor(sln1.lastInput/2) - pivot + 1, sequenceLength do
+            sequence = sequence..sln2Seq[i]..','
+        end
+    end
+
+    solution.inputString = sequence
+    return solution
+end
+
 function createChild(sln1, sln2)
     local solution = newSolution()
     local sequence = ""
     local sln1Seq = mysplit(sln1.inputString, ',')
     local sln2Seq = mysplit(sln2.inputString, ',')
-    local pivot = math.random(-50,50)
+    local pivot = math.random((-1 * pivotRange),pivotRange)
     local mutate = shouldMutate()
     local mutationLocations = getMutationIndices()
 
@@ -317,32 +392,28 @@ end
 --Starts new generation with best 2 from previous generation
 --
 function crossoverMR1()
-    print("TESTING CROSSOVER")
     local newPop = {}
     newPop[1] = population[1]
     newPop[2] = population[2]
 
-    newPop[3] = createChild(population[1], population[2])
-    newPop[4] = createChild(population[2], population[1])
+    newPop[3] = createChildMR(population[1], population[2])
+    newPop[4] = createChildMR(population[2], population[1])
 
     newParentIndex = 3
     newPopIndex = 5
     while table.getn(newPop) < populationSize do
-        print("ADDING PARENT: "..newParentIndex)
         newPop[newPopIndex] = population[newParentIndex]
         newPopIndex = newPopIndex + 1
 
         for i = 1, newParentIndex - 1 do
-            print("CREATING CHILD ("..i..","..newParentIndex..")")
-            newPop[newPopIndex] = createChild(population[i], population[newParentIndex])
+            newPop[newPopIndex] = createChildMR(population[i], population[newParentIndex])
             newPopIndex = newPopIndex + 1
 
             if table.getn(newPop) > populationSize then
                 break
             end
 
-            print("CREATING CHILD ("..newParentIndex..","..i..")")
-            newPop[newPopIndex] = createChild(population[newParentIndex], population[i])
+            newPop[newPopIndex] = createChildMR(population[newParentIndex], population[i])
             newPopIndex = newPopIndex + 1
 
             if table.getn(newPop) > populationSize then
@@ -362,14 +433,32 @@ generation = 1
 
 --Main Loop
 while true do
+    parentNum = 1
+
+    print("")
+    print("")
     print("Generation: "..generation)
 
     for i = 1, populationSize do
         savestate.load(Filename)
-        runSolution(population[i])
+        readTime()
+        initialTime = timerHundreds..timerTens..timerOnes
+
+        if population[i].grade == 0 then
+            console.log("")
+            console.log("Solution "..i)
+            runSolution(population[i])
+        else
+            console.log("")
+            console.log("Parent "..parentNum)
+            console.log("Grade: "..population[i].grade)
+            parentNum = parentNum + 1
+        end
     end
 
     sortPopulationByScore()
     crossoverMR1()
+
     generation = generation + 1
+    parentNum = 0
 end
