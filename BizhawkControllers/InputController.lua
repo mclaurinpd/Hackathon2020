@@ -14,26 +14,30 @@ input['X'] = false
 input['Y'] = false
 
 --System
-Filename = 'YoshisIsland1.State'
+Filename = 'YoshisIsland2.State'
 fps = 60                                    --SMW fps
 maxTime = 300                               --Time to run per level
-framesPerSequence = 10                      --Number of frames inputs will be held for
+framesPerSequence = 8                      --Number of frames inputs will be held for
 framesBetweenSequence = 0                   --Number of frames inputs will be released between instructions
 sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)            --Calculates length of input sequence
 
 --Genetic Algorithm
-populationSize = 20                         --Size of population used by genetic algorithm
+populationSize = 32                         --Size of population used by genetic algorithm
 generations = 10
-mutationChance = .2                         --Chance child will mutate
+mutationChance = .1                         --Chance child will mutate
+sprintMutateChance = .75                    --Chance child of winning parent will try to hold sprint and right
+sprintMutateCount = 3                       --Maximum number of inputs to change to 'Right+X' on mutate
+numRandomMutations = 3                      --Number of places in sequence to create random mutations
+randomMutationRange = 3                     --Number of inputs that will be changed per random mutation
 mutationsAllowed = 550                      --Number of inputs that will be altered with mutation
 deathBuffer = 20                            --Number of inputs before death to start crossover
-pivotRange = 50                             --Maximum number of inputs away from midpoint to start crossover
+pivotRange = 20                             --Maximum number of inputs away from midpoint to start crossover
 
 --Bonuses/Biases
 rightBias = 0.75                            --Percentage chance that initial input will contain 'Right'
-speedBias = 5                               --Bonus applied for average speed of solution
+speedBias = 20                              --Bonus applied for average speed of solution
 victoryBonus = 10000                        --Flat bonus applied to ensure success is favored above everything else
-biasValue = 10                              --Penalty applied for number of 'Left' inputs
+biasValue = 1                               --Penalty applied for number of 'Left' inputs
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
 buttonInputs = {'A', 'B', 'X', 'N' }
@@ -128,22 +132,25 @@ function calculateGrade()
 end
 
 function advanceFrames(num)
-    for i = 1, num do
-        joypad.set(input, 1)
-        readGameData()
-        displayGameData()
+    if num ~= 0 then
+        for i = 1, num do
+            joypad.set(input, 1)
+            readGameData()
+            displayGameData()
 
-        if animation == 9 then
-            death = true
-            break
+            if animation == 9 then
+                death = true
+                break
+            end
+
+            if gameMode == 79 then
+                marioX = 10000
+                finish = true
+                break
+            end
+
+            emu.frameadvance()
         end
-
-        if gameMode == 1 then
-            finish = true
-            break
-        end
-
-        emu.frameadvance()
     end
 end
 
@@ -247,6 +254,10 @@ function runSolution(solution)
         end
     end
 
+    if not death and not finish then
+        solution.lastInput = index
+    end
+
     solution.grade = grade
 
     if finish == true then
@@ -266,14 +277,21 @@ function runSolution(solution)
 end
 
 function applyBiasMR(solution)
-    numLefts = countLefts(mysplit(solution.inputString, ","))
+    local wholeSeq = mysplit(solution.inputString, ",")
+    local usedSeq = {}
+
+    for i = 1, solution.lastInput do
+        usedSeq[i] = wholeSeq[i]
+    end
+
+    numLefts = countLefts(usedSeq)
     print("Number of Lefts:"..numLefts)
     solution.grade = solution.grade - (numLefts * biasValue)
 end
 
 function countLefts(str)
     count = 0
-    for i = 1, sequenceLength do
+    for i = 1, table.getn(str) - 1 do
         if string.find(str[i], "Left") then
             count = count + 1
         end
@@ -300,33 +318,105 @@ function shouldMutate()
     return false
 end
 
+function shouldSprintMutate()
+    local chance = math.random()
+
+    if not (chance < sprintMutateChance) then
+        return true
+    end
+
+    return false
+end
+
+--Will change randomMutationRange inputs at numRandomMutations places in given sequence
+function randomSequenceMutation(original, lastInput)
+    local origSeq = mysplit(original, ',')
+    local result = ""
+
+    for i = 1, numRandomMutations do
+        mutationStart = math.random(1, lastInput)
+        mutationEnd = mutationStart + randomMutationRange
+
+        for j = mutationStart, mutationEnd do
+            origSeq[j] = generateInputElement()
+        end
+    end
+
+    for i = 1, sequenceLength do
+        result = result..origSeq[i]..','
+    end
+
+    return result
+end
+
+--Will add a 'Right+X' input in a random position before lastInput
+function sprintMutate(original, lastInput)
+    local origSeq = mysplit(original, ',')
+    local result = ""
+    local index = math.random(1, lastInput)
+    local maxSprintMutates = math.random(1, sprintMutateCount)
+
+    for i = index, index + maxSprintMutates do
+        origSeq[i] = 'Right+X'
+    end
+
+    for i = 1, sequenceLength do
+        result = result..origSeq[i]..','
+    end
+
+    return result
+end
+
 function createChildMR(sln1, sln2)
     local solution = newSolution()
     local sequence = ""
     local sln1Seq = mysplit(sln1.inputString, ',')
     local sln2Seq = mysplit(sln2.inputString, ',')
-    local pivot = math.random((-1 * pivotRange),pivotRange)
+    local pivot = math.random(1, pivotRange)
+    local deathBufferStart = sln1.lastInput - deathBuffer
+    local deathBufferEnd = sln1.lastInput + deathBuffer
+
+    if deathBufferStart < 0 then
+        deathBufferStart = 0
+    end
+
+    if deathBufferEnd > sequenceLength then
+        deathBufferEnd = sequenceLength
+    end
 
     if sln1.died then
-        for i = 1, sln1.lastInput - deathBuffer do
+        for i = 1, deathBufferStart do
             sequence = sequence..sln1Seq[i]..','
         end
 
-        for i = sln1.lastInput - deathBuffer + 1, sln1.lastInput + deathBuffer do
+        for i = deathBufferStart + 1, deathBufferEnd do
             sequence = sequence..generateInputElement()..','
         end
 
-        for i = sln1.lastInput + deathBuffer + 1, sequenceLength do
+        for i = deathBufferEnd + 1, sequenceLength do
             sequence = sequence..sln2Seq[i]..','
         end
     else
-        for i = 1, math.floor(sln1.lastInput/2) - pivot do
+        midSequence = math.floor(sln1.lastInput/2) - pivot
+        if (midSequence < 0 or midSequence > sequenceLength) then
+            print("USING WHOLE SEQUENCE MIDPOINT!!!")
+            midSequence = math.floor(sequenceLength/2)
+        end
+        for i = 1, midSequence do
             sequence = sequence..sln1Seq[i]..','
         end
 
-        for i = math.floor(sln1.lastInput/2) - pivot + 1, sequenceLength do
+        for i = midSequence + 1, sequenceLength do
             sequence = sequence..sln2Seq[i]..','
         end
+
+        if shouldSprintMutate() then
+            sequence = sprintMutate(sequence, sln1.lastInput)
+        end
+    end
+
+    if shouldMutate() then
+        sequence = randomSequenceMutation(sequence, sln1.lastInput)
     end
 
     solution.inputString = sequence
@@ -388,9 +478,11 @@ function initializePopulation()
     end
 end
 
---Small scale testing crossover algorithm (requires populationSize > 4)
+--"Chosen Ones" set crossover algorithm (requires populationSize > 4)
 --Starts new generation with best 2 from previous generation
---
+--Creates new children by crossing 2 parents both ways
+--Repeatedly adds new parents and creates new children by permutating until population full
+--{1, 2, (1,2), (2,1), 3, (1,3), (2,3), (3,1), (3,2), 4, (1,4), (2,4)...}
 function crossoverMR1()
     local newPop = {}
     newPop[1] = population[1]
@@ -452,6 +544,8 @@ while true do
             console.log("")
             console.log("Parent "..parentNum)
             console.log("Grade: "..population[i].grade)
+            console.log("Died: "..(population[i].died and 'true' or 'false'))
+            console.log("Last Input: "..population[i].lastInput)
             parentNum = parentNum + 1
         end
     end
