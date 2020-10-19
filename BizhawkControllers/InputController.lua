@@ -14,30 +14,37 @@ input['X'] = false
 input['Y'] = false
 
 --System
-Filename = 'YoshisIsland2.State'
+levelName = 'YoshisIsland1'                 --Name of level
+Filename = levelName..'.State'              --Save state filename
+seedFilename = 'seed.txt'                   --Filename to load input string seed from
+shouldSeed = true                           --Whether initial population should contain seed from file (if false, will be entirely random)
+levelLength = 5000                          --Should be set close to the length of the level, flat value that X position will be set to upon victory
 fps = 60                                    --SMW fps
 maxTime = 300                               --Time to run per level
-framesPerSequence = 8                      --Number of frames inputs will be held for
+framesPerSequence = 15                      --Number of frames inputs will be held for
 framesBetweenSequence = 0                   --Number of frames inputs will be released between instructions
-sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)            --Calculates length of input sequence
 
 --Genetic Algorithm
 populationSize = 32                         --Size of population used by genetic algorithm
-generations = 10
+generations = 15                            --Number of generations before seeding new, random population
 mutationChance = .1                         --Chance child will mutate
-sprintMutateChance = .75                    --Chance child of winning parent will try to hold sprint and right
+sprintMutateChance = .5                     --Chance child of winning parent will try to hold sprint and right
 sprintMutateCount = 3                       --Maximum number of inputs to change to 'Right+X' on mutate
 numRandomMutations = 3                      --Number of places in sequence to create random mutations
 randomMutationRange = 3                     --Number of inputs that will be changed per random mutation
 mutationsAllowed = 550                      --Number of inputs that will be altered with mutation
-deathBuffer = 20                            --Number of inputs before death to start crossover
-pivotRange = 20                             --Maximum number of inputs away from midpoint to start crossover
+deathBuffer = 10                            --Number of inputs before death to start crossover
+pivotRange = 35                             --Maximum number of inputs away from midpoint to start crossover
 
 --Bonuses/Biases
-rightBias = 0.75                            --Percentage chance that initial input will contain 'Right'
-speedBias = 20                              --Bonus applied for average speed of solution
-victoryBonus = 10000                        --Flat bonus applied to ensure success is favored above everything else
-biasValue = 1                               --Penalty applied for number of 'Left' inputs
+rightBias = 0.75                            --Percentage chance that initial input will be changed to contain 'Right'
+speedBias = 10                              --Bonus applied for average speed of solution
+victoryBonus = 0                            --Flat bonus applied to ensure success is favored above everything else
+biasValue = 0.1                             --Penalty applied for number of 'Left' inputs
+distanceBonus = 8                           --Bonus applied based on distance travelled
+timeBias = 5                                --Bonus applied based on elapsed time
+
+sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)            --Calculates length of input sequence
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
 buttonInputs = {'A', 'B', 'X', 'N' }
@@ -81,6 +88,7 @@ function newSolution()
     solution.grade = 0
     solution.lastInput = 0
     solution.died = false
+    solution.time = 0
 
     return solution
 end
@@ -112,11 +120,12 @@ function readGameData()
     marioX = memory.read_s16_le(0x94)
     animation = memory.readbyte(0x71)
     gameMode = memory.readbyte(0x13D6)
+    paused = memory.readbyte(0x1B89)
+    yoshi = memory.readbyte(0x18E8)
     readTime()
 end
 
 function displayGameData()
-    calculateGrade()
     gui.text(50, 50, grade)
     gui.text(50, 75, "Animation: "..animation)          --if animation == 09 -> death
     gui.text(50, 100, "Game Mode: "..gameMode)          --if game mode == 8204 w/out death animation -> victory
@@ -124,11 +133,17 @@ function displayGameData()
     gui.text(50, 150, "Initial Time: "..initialTime)
     gui.text(50, 200, "Elapsed Time: "..(initialTime -  timerValue))
     gui.text(50, 225, "Average Speed: "..(marioX/(initialTime - timerValue)))
+    gui.text(50, 250, "Current Speed: "..xSpeed)
+    gui.text(50, 275, "Total X Speed: "..totalXSpeed)
+    gui.text(50, 300, "Average X Speed: "..avgXSpeed)
+    gui.text(50, 325, "Pause Flag: "..paused)
+    gui.text(50, 350, "Yoshi Text: "..yoshi)
+    calculateGrade()
 end
 
 function calculateGrade()
-    averageSpeed = marioX/(initialTime - timerValue)
-    grade = marioX + (speedBias * averageSpeed)
+    averageSpeed = avgXSpeed
+    grade = (marioX * distanceBonus) + (speedBias * averageSpeed)
 end
 
 function advanceFrames(num)
@@ -140,15 +155,24 @@ function advanceFrames(num)
 
             if animation == 9 then
                 death = true
+                calculateGrade()
                 break
             end
 
             if gameMode == 79 then
-                marioX = 10000
+                marioX = levelLength
                 finish = true
+                calculateGrade()
                 break
             end
 
+            if paused == 0 and yoshi == 0 then
+                xSpeed = memory.read_s8(0x007B)
+                totalXSpeed = totalXSpeed + xSpeed * 0.02
+                avgXSpeed = totalXSpeed / (initialTime -  timerValue)
+            end
+
+            frameNum = frameNum + 1
             emu.frameadvance()
         end
     end
@@ -259,9 +283,11 @@ function runSolution(solution)
     end
 
     solution.grade = grade
+    solution.time = (initialTime -  timerValue)
 
     if finish == true then
         solution.grade = solution.grade + victoryBonus
+        solution.grade = solution.grade + (initialTime - (initialTime -  timerValue)) * timeBias
     end
 
     applyBiasMR(solution)
@@ -270,6 +296,7 @@ function runSolution(solution)
     console.log("Grade: "..solution.grade)
     console.log("Last Input: "..solution.lastInput)
     console.log("Died: "..(solution.died and 'true' or 'false'))
+    console.log("Elapsed Time: "..(initialTime -  timerValue))
 
     if finish == true then
         console.log("SUCCESS!!!")
@@ -518,41 +545,84 @@ function crossoverMR1()
     population = newPop
 end
 
+-- Write a string to a file.
+function write(filename, contents)
+  local fh = assert(io.open(filename, "wb"))
+  fh:write(contents)
+  fh:flush()
+  fh:close()
+end
+
+-- Read an entire file.
+-- Use "a" in Lua 5.3; "*a" in Lua 5.1 and 5.2
+function readall(filename)
+  local fh = assert(io.open(filename, "rb"))
+  local contents = assert(fh:read(_VERSION <= "Lua 5.2" and "*a" or "a"))
+  fh:close()
+  return contents
+end
+
 --Initialization
 math.randomseed(os.time())
 initializePopulation()
 generation = 1
+console.clear()
+xSpeed = 0
+avgXSpeed = 0
+
+if shouldSeed then
+    population[1].inputString = readall(seedFilename)
+end
 
 --Main Loop
 while true do
-    parentNum = 1
+    for j = 1, generations do
+        parentNum = 1
 
-    print("")
-    print("")
-    print("Generation: "..generation)
+        print("")
+        print("")
+        print("Generation: "..generation)
 
-    for i = 1, populationSize do
-        savestate.load(Filename)
-        readTime()
-        initialTime = timerHundreds..timerTens..timerOnes
+        for i = 1, populationSize do
+            savestate.load(Filename)
+            readTime()
+            initialTime = timerHundreds..timerTens..timerOnes
+            frameNum = 0
+            totalXSpeed = 0
 
-        if population[i].grade == 0 then
-            console.log("")
-            console.log("Solution "..i)
-            runSolution(population[i])
-        else
-            console.log("")
-            console.log("Parent "..parentNum)
-            console.log("Grade: "..population[i].grade)
-            console.log("Died: "..(population[i].died and 'true' or 'false'))
-            console.log("Last Input: "..population[i].lastInput)
-            parentNum = parentNum + 1
+            if population[i].grade == 0 then
+                console.log("")
+                console.log("Solution "..i)
+                runSolution(population[i])
+            else
+                console.log("")
+                console.log("Parent "..parentNum)
+                console.log("Grade: "..population[i].grade)
+                console.log("Last Input: "..population[i].lastInput)
+                console.log("Died: "..(population[i].died and 'true' or 'false'))
+                console.log("Elapsed Time: "..population[i].time)
+                parentNum = parentNum + 1
+            end
         end
+
+        sortPopulationByScore()
+        bestTime = population[1].time
+        bestInput = population[1].inputString
+        write(levelName.."/Generation "..generation.."-"..levelName.."-"..bestTime..".txt", bestInput)
+        crossoverMR1()
+
+        generation = generation + 1
+        parentNum = 0
     end
 
-    sortPopulationByScore()
-    crossoverMR1()
+    bestFilename = levelName.."-overall-"..bestTime..".txt"
+    write(bestFilename, bestInput)
 
-    generation = generation + 1
-    parentNum = 0
+    --Re-Initialization
+    math.randomseed(os.time())
+    initializePopulation()
+    generation = 1
+    console.clear()
+
+    population[1].inputString = readall(bestFilename)
 end
