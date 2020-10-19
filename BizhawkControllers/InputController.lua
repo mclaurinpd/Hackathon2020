@@ -606,9 +606,11 @@ while true do
         end
 
         sortPopulationByScore()
-        bestTime = population[1].time
-        bestInput = population[1].inputString
-        write(levelName.."/Generation "..generation.."-"..levelName.."-"..bestTime..".txt", bestInput)
+        if not population[1].died then
+            bestTime = population[1].time
+            bestInput = population[1].inputString
+            write(levelName.."/Generation "..generation.."-"..levelName.."-"..bestTime..".txt", bestInput)
+        end
         crossoverMR1()
 
         generation = generation + 1
