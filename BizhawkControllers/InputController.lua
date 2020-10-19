@@ -26,7 +26,7 @@ framesBetweenSequence = 0                   --Number of frames inputs will be re
 
 --Genetic Algorithm
 populationSize = 32                         --Size of population used by genetic algorithm
-generations = 15                            --Number of generations before seeding new, random population
+generations = 20                            --Number of generations before seeding new, random population
 mutationChance = .1                         --Chance child will mutate
 sprintMutateChance = .5                     --Chance child of winning parent will try to hold sprint and right
 sprintMutateCount = 3                       --Maximum number of inputs to change to 'Right+X' on mutate
