@@ -19,7 +19,7 @@ Filename = levelName..'.State'              --Save state filename
 seedFilename = 'seed.txt'                   --Filename to load input string seed from
 shouldSeed = false                          --Whether initial population should contain seed from file (if false, will be entirely random)
 seed2Filename = 'seed2.txt'                 --Filename to load second input string seed from
-doubleSeed = true                           --Whether initial population should contain two seeds from files
+doubleSeed = false                          --Whether initial population should contain two seeds from files
 levelLength = 5000                          --Should be set close to the length of the level, flat value that X position will be set to upon victory
 fps = 60                                    --SMW fps
 maxTime = 300                               --Time to run per level
@@ -27,7 +27,7 @@ framesPerSequence = 15                      --Number of frames inputs will be he
 framesBetweenSequence = 0                   --Number of frames inputs will be released between instructions
 
 --Genetic Algorithm
-populationSize = 128                        --Size of population used by genetic algorithm
+populationSize = 32                        --Size of population used by genetic algorithm
 generations = 35                            --Number of generations before seeding new, random population
 mutationChance = .1                         --Chance child will mutate
 sprintMutateChance = .5                     --Chance child of winning parent will try to hold sprint and right
@@ -40,11 +40,11 @@ pivotRange = 35                             --Maximum number of inputs away from
 
 --Bonuses/Biases
 rightBias = 0.75                            --Percentage chance that initial input will be changed to contain 'Right'
-speedBias = 10                              --Bonus applied for average speed of solution
+speedBias = 15                              --Bonus applied for average speed of solution
 victoryBonus = 0                            --Flat bonus applied to ensure success is favored above everything else
 biasValue = 0.1                             --Penalty applied for number of 'Left' inputs
-distanceBonus = 8                           --Bonus applied based on distance travelled
-timeBias = 5                                --Bonus applied based on elapsed time
+distanceBonus = 1                           --Bonus applied based on distance travelled
+timeBias = 10                               --Bonus applied based on elapsed time if victory
 
 sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)            --Calculates length of input sequence
 
@@ -91,7 +91,8 @@ function newSolution()
     solution.lastInput = 0
     solution.died = false
     solution.time = 0
-
+    solution.speed = 0
+    solution.position = 0
     return solution
 end
 
@@ -286,6 +287,8 @@ function runSolution(solution)
 
     solution.grade = grade
     solution.time = (initialTime -  timerValue)
+    solution.speed = averageSpeed
+    solution.position = marioX
 
     if finish == true then
         solution.grade = solution.grade + victoryBonus
@@ -314,7 +317,7 @@ function applyBiasMR(solution)
     end
 
     numLefts = countLefts(usedSeq)
-    print("Number of Lefts:"..numLefts)
+    console.log("Number of Lefts:"..numLefts)
     solution.grade = solution.grade - (numLefts * biasValue)
 end
 
@@ -428,7 +431,7 @@ function createChildMR(sln1, sln2)
     else
         midSequence = math.floor(sln1.lastInput/2) - pivot
         if (midSequence < 0 or midSequence > sequenceLength) then
-            print("USING WHOLE SEQUENCE MIDPOINT!!!")
+            console.log("USING WHOLE SEQUENCE MIDPOINT!!!")
             midSequence = math.floor(sequenceLength/2)
         end
         for i = 1, midSequence do
@@ -584,11 +587,12 @@ while true do
     for j = 1, generations do
         parentNum = 1
 
-        print("")
-        print("")
-        print("Generation: "..generation)
+        console.log("")
+        console.log("")
+        console.log("Generation: "..generation)
 
         for i = 1, populationSize do
+            console.log("\n\n\n")
             savestate.load(Filename)
             readTime()
             initialTime = timerHundreds..timerTens..timerOnes
@@ -596,12 +600,12 @@ while true do
             totalXSpeed = 0
 
             if population[i].grade == 0 then
-                console.log("")
                 console.log("Solution "..i)
                 runSolution(population[i])
             else
-                console.log("")
                 console.log("Parent "..parentNum)
+                console.log("Average Speed: "..population[i].speed)
+                console.log("Position: "..population[i].position)
                 console.log("Grade: "..population[i].grade)
                 console.log("Last Input: "..population[i].lastInput)
                 console.log("Died: "..(population[i].died and 'true' or 'false'))
@@ -617,6 +621,10 @@ while true do
             write(levelName.."/Generation "..generation.."-"..levelName.."-"..bestTime..".txt", bestInput)
         end
         crossoverMR1()
+
+        if (generation % 2 == 0) then
+            console.clear()
+        end
 
         generation = generation + 1
         parentNum = 0
