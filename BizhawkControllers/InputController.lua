@@ -27,7 +27,7 @@ framesPerSequence = 15                      --Number of frames inputs will be he
 framesBetweenSequence = 0                   --Number of frames inputs will be released between instructions
 
 --Genetic Algorithm
-populationSize = 32                        --Size of population used by genetic algorithm
+populationSize = 128                        --Size of population used by genetic algorithm
 generations = 35                            --Number of generations before seeding new, random population
 mutationChance = .1                         --Chance child will mutate
 sprintMutateChance = .5                     --Chance child of winning parent will try to hold sprint and right
@@ -296,7 +296,7 @@ function runSolution(solution)
     end
 
     applyBiasMR(solution)
-    console.log("Average Speed: "..averageSpeed)
+    print("Average Speed: "..averageSpeed)
     console.log("Position: "..marioX)
     console.log("Grade: "..solution.grade)
     console.log("Last Input: "..solution.lastInput)
@@ -591,25 +591,22 @@ while true do
         console.log("")
         console.log("Generation: "..generation)
 
-        for i = 1, populationSize do
-            console.log("\n\n\n")
+        for solNum = 1, populationSize do
+            console.log("\n")
             savestate.load(Filename)
             readTime()
             initialTime = timerHundreds..timerTens..timerOnes
             frameNum = 0
             totalXSpeed = 0
 
-            if population[i].grade == 0 then
-                console.log("Solution "..i)
-                runSolution(population[i])
+            if population[solNum].grade == 0 then
+                print("Solution "..solNum)
+                runSolution(population[solNum])
             else
-                console.log("Parent "..parentNum)
-                console.log("Average Speed: "..population[i].speed)
-                console.log("Position: "..population[i].position)
-                console.log("Grade: "..population[i].grade)
-                console.log("Last Input: "..population[i].lastInput)
-                console.log("Died: "..(population[i].died and 'true' or 'false'))
-                console.log("Elapsed Time: "..population[i].time)
+                died = tostring(population[solNum].died)
+                lastInput = tostring(population[solNum].lastInput)
+                pGrade = tostring(population[solNum].grade)
+                console.log("Parent "..parentNum.."\nAverage Speed: "..population[solNum].speed.."\nParent Position: "..population[solNum].position.."\nParent Grade: "..pGrade.."\nParent Last Input: "..lastInput.."\nDied: "..died.."\nElapsed Time: "..population[solNum].time)
                 parentNum = parentNum + 1
             end
         end
