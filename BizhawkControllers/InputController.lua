@@ -17,7 +17,9 @@ input['Y'] = false
 levelName = 'YoshisIsland1'                 --Name of level
 Filename = levelName..'.State'              --Save state filename
 seedFilename = 'seed.txt'                   --Filename to load input string seed from
-shouldSeed = true                           --Whether initial population should contain seed from file (if false, will be entirely random)
+shouldSeed = false                          --Whether initial population should contain seed from file (if false, will be entirely random)
+seed2Filename = 'seed2.txt'                 --Filename to load second input string seed from
+doubleSeed = true                           --Whether initial population should contain two seeds from files
 levelLength = 5000                          --Should be set close to the length of the level, flat value that X position will be set to upon victory
 fps = 60                                    --SMW fps
 maxTime = 300                               --Time to run per level
@@ -25,11 +27,11 @@ framesPerSequence = 15                      --Number of frames inputs will be he
 framesBetweenSequence = 0                   --Number of frames inputs will be released between instructions
 
 --Genetic Algorithm
-populationSize = 32                         --Size of population used by genetic algorithm
-generations = 20                            --Number of generations before seeding new, random population
+populationSize = 128                        --Size of population used by genetic algorithm
+generations = 35                            --Number of generations before seeding new, random population
 mutationChance = .1                         --Chance child will mutate
 sprintMutateChance = .5                     --Chance child of winning parent will try to hold sprint and right
-sprintMutateCount = 3                       --Maximum number of inputs to change to 'Right+X' on mutate
+sprintMutateCount = 2                       --Maximum number of inputs to change to 'Right+X' on mutate
 numRandomMutations = 3                      --Number of places in sequence to create random mutations
 randomMutationRange = 3                     --Number of inputs that will be changed per random mutation
 mutationsAllowed = 550                      --Number of inputs that will be altered with mutation
@@ -572,6 +574,9 @@ avgXSpeed = 0
 
 if shouldSeed then
     population[1].inputString = readall(seedFilename)
+    if doubleSeed then
+        population[2].inputString = readall(seed2Filename)
+    end
 end
 
 --Main Loop
