@@ -13,40 +13,43 @@ input['Up'] = false
 input['X'] = false
 input['Y'] = false
 
+--Level
+levelName = 'YoshisIsland3'                 --Name of level
+distanceBuffer = 0                        --Distance that must be travelled before speed affects grading function (helps Mario learn survival before speed)
+
 --System
-levelName = 'YoshisIsland1'                 --Name of level
 Filename = levelName..'.State'              --Save state filename
 seedFilename = 'seed.txt'                   --Filename to load input string seed from
-shouldSeed = false                          --Whether initial population should contain seed from file (if false, will be entirely random)
+shouldSeed = true                          --Whether initial population should contain seed from file (if false, will be entirely random)
 seed2Filename = 'seed2.txt'                 --Filename to load second input string seed from
 doubleSeed = false                          --Whether initial population should contain two seeds from files
-levelLength = 5000                          --Should be set close to the length of the level, flat value that X position will be set to upon victory
 fps = 60                                    --SMW fps
-maxTime = 300                               --Time to run per level
-framesPerSequence = 15                      --Number of frames inputs will be held for
+maxTime = 90                                --Time to run per level
+framesPerSequence = 5                       --Number of frames inputs will be held for
 framesBetweenSequence = 0                   --Number of frames inputs will be released between instructions
 
 --Genetic Algorithm
-populationSize = 128                        --Size of population used by genetic algorithm
-generations = 35                            --Number of generations before seeding new, random population
-mutationChance = .1                         --Chance child will mutate
-sprintMutateChance = .5                     --Chance child of winning parent will try to hold sprint and right
+populationSize = 128                         --Size of population used by genetic algorithm
+generations = 15                            --Number of generations before seeding new, random population
+mutationChance = .12                        --Chance child will mutate
+sprintMutateChance = .75                    --Chance child of winning parent will try to hold sprint and right
 sprintMutateCount = 2                       --Maximum number of inputs to change to 'Right+X' on mutate
-numRandomMutations = 3                      --Number of places in sequence to create random mutations
+numRandomMutations = 2                      --Number of places in sequence to create random mutations
 randomMutationRange = 3                     --Number of inputs that will be changed per random mutation
 mutationsAllowed = 550                      --Number of inputs that will be altered with mutation
-deathBuffer = 10                            --Number of inputs before death to start crossover
+deathBuffer = 18                            --Maximum number of inputs before death to start crossover
 pivotRange = 35                             --Maximum number of inputs away from midpoint to start crossover
 
 --Bonuses/Biases
-rightBias = 0.75                            --Percentage chance that initial input will be changed to contain 'Right'
-speedBias = 15                              --Bonus applied for average speed of solution
+rightBias = 0.0                             --Percentage chance that initial input will be changed to contain 'Right'
+sprintBias = 0.5                           --Percentage chance that initial input will be changed to contain 'X'
+speedBias = 1                               --Bonus applied for average speed of solution
 victoryBonus = 0                            --Flat bonus applied to ensure success is favored above everything else
-biasValue = 0.1                             --Penalty applied for number of 'Left' inputs
-distanceBonus = 1                           --Bonus applied based on distance travelled
-timeBias = 10                               --Bonus applied based on elapsed time if victory
+biasValue = 0                               --Penalty applied for number of 'Left' inputs
+distanceBonus = 0.5                         --Bonus applied based on distance travelled
+timeBias = 0.0                              --Bonus applied based on elapsed time if victory
 
-sequenceLength = fps * maxTime / (framesPerSequence + framesBetweenSequence)            --Calculates length of input sequence
+sequenceLength = fps * (maxTime * (2/3)) / (framesPerSequence + framesBetweenSequence)            --Calculates length of input sequence
 
 allInputs = {'A', 'B', 'X', 'Right', 'Left', 'Down', 'N'}
 buttonInputs = {'A', 'B', 'X', 'N' }
@@ -116,11 +119,15 @@ function readTime()
     timerHundreds = memory.readbyte(0xF31)
     timerTens = memory.readbyte(0xF32)
     timerOnes = memory.readbyte(0xF33)
-    timerValue = timerHundreds..timerTens..timerOnes
+    timerWhole = tonumber(timerHundreds..timerTens..timerOnes)
+    timerDecimals = tonumber(memory.readbyte(0xF30))/40
+    timerValue = timerWhole+timerDecimals
+    elapsedTime = initialTime - timerValue
 end
 
 function readGameData()
-    marioX = memory.read_s16_le(0x94)
+    currPos = memory.read_s16_le(0x94)
+    marioX = currPos - initialPos
     animation = memory.readbyte(0x71)
     gameMode = memory.readbyte(0x13D6)
     paused = memory.readbyte(0x1B89)
@@ -134,24 +141,25 @@ function displayGameData()
     gui.text(50, 100, "Game Mode: "..gameMode)          --if game mode == 8204 w/out death animation -> victory
     gui.text(50, 125, "Timer Value: "..timerValue)
     gui.text(50, 150, "Initial Time: "..initialTime)
-    gui.text(50, 200, "Elapsed Time: "..(initialTime -  timerValue))
-    gui.text(50, 225, "Average Speed: "..(marioX/(initialTime - timerValue)))
-    gui.text(50, 250, "Current Speed: "..xSpeed)
-    gui.text(50, 275, "Total X Speed: "..totalXSpeed)
-    gui.text(50, 300, "Average X Speed: "..avgXSpeed)
-    gui.text(50, 325, "Pause Flag: "..paused)
-    gui.text(50, 350, "Yoshi Text: "..yoshi)
+    gui.text(50, 200, "Elapsed Time: "..elapsedTime)
+    gui.text(50, 225, "Average Speed: "..(marioX/elapsedTime))
+    gui.text(50, 250, "Pause Flag: "..paused)
+    gui.text(50, 275, "Yoshi Text: "..yoshi)
     calculateGrade()
 end
 
 function calculateGrade()
-    averageSpeed = avgXSpeed
-    grade = (marioX * distanceBonus) + (speedBias * averageSpeed)
+    averageSpeed = marioX / elapsedTime
+    grade = marioX * distanceBonus
+    if marioX > distanceBuffer then
+        grade = grade + (speedBias * averageSpeed)
+    end
 end
 
 function advanceFrames(num)
     if num ~= 0 then
-        for i = 1, num do
+        i = 1
+        while i <= num do
             joypad.set(input, 1)
             readGameData()
             displayGameData()
@@ -163,20 +171,20 @@ function advanceFrames(num)
             end
 
             if gameMode == 79 then
-                marioX = levelLength
                 finish = true
                 calculateGrade()
                 break
             end
 
-            if paused == 0 and yoshi == 0 then
-                xSpeed = memory.read_s8(0x007B)
-                totalXSpeed = totalXSpeed + xSpeed * 0.02
-                avgXSpeed = totalXSpeed / (initialTime -  timerValue)
-            end
-
             frameNum = frameNum + 1
+
+            beforeValue = timerDecimals
             emu.frameadvance()
+            afterValue = timerDecimals
+
+            if beforeValue == afterValue then
+                i = i + 1
+            end
         end
     end
 end
@@ -230,6 +238,12 @@ function generateInputElement()
         end
     end
 
+    if firstInput == 'Right' and secondInput ~= 'X' then
+        if shouldChangeSprint() then
+            secondInput = 'X'
+        end
+    end
+
     if firstInput == 'N' then
         element = element .. firstInput .. ','
         return element
@@ -245,6 +259,16 @@ function generateInputElement()
     element = element .. '+' .. secondInput .. ','
 
     return element
+end
+
+function shouldChangeSprint()
+    local chance = math.random()
+
+    if (chance < sprintBias) then
+        return true
+    end
+
+    return false
 end
 
 function shouldChangeInput()
@@ -292,7 +316,7 @@ function runSolution(solution)
 
     if finish == true then
         solution.grade = solution.grade + victoryBonus
-        solution.grade = solution.grade + (initialTime - (initialTime -  timerValue)) * timeBias
+        solution.grade = solution.grade + timerValue * timeBias
     end
 
     applyBiasMR(solution)
@@ -404,9 +428,14 @@ function createChildMR(sln1, sln2)
     local sequence = ""
     local sln1Seq = mysplit(sln1.inputString, ',')
     local sln2Seq = mysplit(sln2.inputString, ',')
-    local pivot = math.random(1, pivotRange)
-    local deathBufferStart = sln1.lastInput - deathBuffer
-    local deathBufferEnd = sln1.lastInput + deathBuffer
+    local randDeathBuffer = math.random(3, deathBuffer)
+    local deathBufferStart = sln1.lastInput - randDeathBuffer
+    local deathBufferEnd = sln1.lastInput + randDeathBuffer
+    local lessTime = false
+
+    if table.getn(sln2Seq) < table.getn(sln1Seq) then
+        lessTime = true
+    end
 
     if deathBufferStart < 0 then
         deathBufferStart = 0
@@ -425,21 +454,42 @@ function createChildMR(sln1, sln2)
             sequence = sequence..generateInputElement()..','
         end
 
-        for i = deathBufferEnd + 1, sequenceLength do
-            sequence = sequence..sln2Seq[i]..','
+        if not lessTime then
+            for i = deathBufferEnd + 1, sequenceLength do
+                sequence = sequence..sln2Seq[i]..','
+            end
+        else
+            for i = deathBufferEnd + 1, table.getn(sln2Seq) do
+                sequence = sequence..sln2Seq[i]..','
+            end
+
+            for i = table.getn(sln2Seq) + 1, sequenceLength do
+                sequence = sequence..generateInputElement()..','
+            end
         end
     else
-        midSequence = math.floor(sln1.lastInput/2) - pivot
-        if (midSequence < 0 or midSequence > sequenceLength) then
-            console.log("USING WHOLE SEQUENCE MIDPOINT!!!")
-            midSequence = math.floor(sequenceLength/2)
-        end
-        for i = 1, midSequence do
-            sequence = sequence..sln1Seq[i]..','
-        end
+        midSequence = math.random(1, sln1.lastInput)
 
-        for i = midSequence + 1, sequenceLength do
-            sequence = sequence..sln2Seq[i]..','
+        if sln1.grade ~= sln2.grade then
+            for i = 1, midSequence do
+                sequence = sequence..sln1Seq[i]..','
+            end
+
+            for i = midSequence + 1, sequenceLength do
+                sequence = sequence..sln2Seq[i]..','
+            end
+        else
+            for i = 1, midSequence - randDeathBuffer do
+                sequence = sequence..sln1Seq[i]..','
+            end
+
+            for i = midSequence - randDeathBuffer + 1, midSequence + randDeathBuffer do
+                sequence = sequence..generateInputElement()..','
+            end
+
+            for i = midSequence +randDeathBuffer + 1, sequenceLength do
+                sequence = sequence..sln2Seq[i]..','
+            end
         end
 
         if shouldSprintMutate() then
@@ -451,8 +501,19 @@ function createChildMR(sln1, sln2)
         sequence = randomSequenceMutation(sequence, sln1.lastInput)
     end
 
-    solution.inputString = sequence
+    seqTbl = mysplit(sequence, ',')
+
+    if do_tables_match(slice(seqTbl, 1, sln1.lastInput), slice(sln1Seq, 1, sln1.lastInput)) or do_tables_match(slice(seqTbl, 1, sln2.lastInput), slice(sln1Seq, 1, sln2.lastInput)) then
+        solution = generateEntireInput()
+    else
+        solution.inputString = sequence
+    end
+
     return solution
+end
+
+function do_tables_match( a, b )
+    return table.concat(a) == table.concat(b)
 end
 
 function createChild(sln1, sln2)
@@ -550,6 +611,17 @@ function crossoverMR1()
     population = newPop
 end
 
+function slice (tbl, s, e)
+    local pos, new = 1, {}
+
+    for i = s, e do
+        new[pos] = tbl[i]
+        pos = pos + 1
+    end
+
+    return new
+end
+
 -- Write a string to a file.
 function write(filename, contents)
   local fh = assert(io.open(filename, "wb"))
@@ -584,6 +656,8 @@ end
 
 --Main Loop
 while true do
+    survived = false
+
     for j = 1, generations do
         parentNum = 1
 
@@ -595,7 +669,8 @@ while true do
             console.log("\n")
             savestate.load(Filename)
             readTime()
-            initialTime = timerHundreds..timerTens..timerOnes
+            initialPos = memory.read_s16_le(0x94)
+            initialTime = timerValue
             frameNum = 0
             totalXSpeed = 0
 
@@ -612,22 +687,31 @@ while true do
         end
 
         sortPopulationByScore()
+        bestInput = population[1].inputString
         if not population[1].died then
-            bestTime = population[1].time
-            bestInput = population[1].inputString
+            survived = true
+            bestTime = math.floor(population[1].time)
             write(levelName.."/Generation "..generation.."-"..levelName.."-"..bestTime..".txt", bestInput)
+        else
+            intGrade = math.floor(population[1].position)
+            trainFilename = "training/"..levelName.."-training-"..intGrade..".txt"
+            write(trainFilename, bestInput)
         end
+
         crossoverMR1()
 
-        if (generation % 2 == 0) then
+        if (generation % 1 == 0) then
             console.clear()
         end
-
         generation = generation + 1
         parentNum = 0
     end
 
-    bestFilename = levelName.."-overall-"..bestTime..".txt"
+    if survived then
+        bestFilename = levelName.."-overall-"..bestTime..".txt"
+    else
+        bestFilename = "training/"..levelName.."-training-"..intGrade..".txt"
+    end
     write(bestFilename, bestInput)
 
     --Re-Initialization
