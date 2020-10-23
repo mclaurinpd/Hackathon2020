@@ -15,12 +15,12 @@ input['Y'] = false
 
 --Level
 levelName = 'YoshisIsland3'                 --Name of level
-distanceBuffer = 0                        --Distance that must be travelled before speed affects grading function (helps Mario learn survival before speed)
+distanceBuffer = 0                          --Distance that must be travelled before speed affects grading function (helps Mario learn survival before speed)
 
 --System
 Filename = levelName..'.State'              --Save state filename
 seedFilename = 'seed.txt'                   --Filename to load input string seed from
-shouldSeed = true                          --Whether initial population should contain seed from file (if false, will be entirely random)
+shouldSeed = true                           --Whether initial population should contain seed from file (if false, will be entirely random)
 seed2Filename = 'seed2.txt'                 --Filename to load second input string seed from
 doubleSeed = false                          --Whether initial population should contain two seeds from files
 fps = 60                                    --SMW fps
@@ -29,21 +29,21 @@ framesPerSequence = 5                       --Number of frames inputs will be he
 framesBetweenSequence = 0                   --Number of frames inputs will be released between instructions
 
 --Genetic Algorithm
-populationSize = 128                         --Size of population used by genetic algorithm
-generations = 15                            --Number of generations before seeding new, random population
+populationSize = 256                        --Size of population used by genetic algorithm
+generations = 10                            --Number of generations before seeding new, random population
 mutationChance = .12                        --Chance child will mutate
 sprintMutateChance = .75                    --Chance child of winning parent will try to hold sprint and right
 sprintMutateCount = 2                       --Maximum number of inputs to change to 'Right+X' on mutate
 numRandomMutations = 2                      --Number of places in sequence to create random mutations
 randomMutationRange = 3                     --Number of inputs that will be changed per random mutation
 mutationsAllowed = 550                      --Number of inputs that will be altered with mutation
-deathBuffer = 18                            --Maximum number of inputs before death to start crossover
+deathBuffer = 24                            --Maximum number of inputs before death to start crossover
 pivotRange = 35                             --Maximum number of inputs away from midpoint to start crossover
 
 --Bonuses/Biases
 rightBias = 0.0                             --Percentage chance that initial input will be changed to contain 'Right'
-sprintBias = 0.5                           --Percentage chance that initial input will be changed to contain 'X'
-speedBias = 1                               --Bonus applied for average speed of solution
+sprintBias = 0.5                            --Percentage chance that initial input will be changed to contain 'X'
+speedBias = 0.1                               --Bonus applied for average speed of solution
 victoryBonus = 0                            --Flat bonus applied to ensure success is favored above everything else
 biasValue = 0                               --Penalty applied for number of 'Left' inputs
 distanceBonus = 0.5                         --Bonus applied based on distance travelled
@@ -115,13 +115,16 @@ function hasValue(table, val)
     return false
 end
 
-function readTime()
+function readTimer()
     timerHundreds = memory.readbyte(0xF31)
     timerTens = memory.readbyte(0xF32)
     timerOnes = memory.readbyte(0xF33)
     timerWhole = tonumber(timerHundreds..timerTens..timerOnes)
     timerDecimals = tonumber(memory.readbyte(0xF30))/40
     timerValue = timerWhole+timerDecimals
+end
+
+function calculateElapsedTime()
     elapsedTime = initialTime - timerValue
 end
 
@@ -132,7 +135,8 @@ function readGameData()
     gameMode = memory.readbyte(0x13D6)
     paused = memory.readbyte(0x1B89)
     yoshi = memory.readbyte(0x18E8)
-    readTime()
+    readTimer()
+    calculateElapsedTime()
 end
 
 function displayGameData()
@@ -178,11 +182,13 @@ function advanceFrames(num)
 
             frameNum = frameNum + 1
 
-            beforeValue = timerDecimals
             emu.frameadvance()
-            afterValue = timerDecimals
+            paused = memory.readbyte(0x1B89)
 
-            if beforeValue == afterValue then
+            if paused == 1 then
+                setInput('A')
+                emu.frameadvance()
+            else
                 i = i + 1
             end
         end
@@ -668,7 +674,7 @@ while true do
         for solNum = 1, populationSize do
             console.log("\n")
             savestate.load(Filename)
-            readTime()
+            readTimer()
             initialPos = memory.read_s16_le(0x94)
             initialTime = timerValue
             frameNum = 0
